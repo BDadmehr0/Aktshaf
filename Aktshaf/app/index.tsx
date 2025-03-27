@@ -3,14 +3,16 @@ import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import MapView, { Marker, Polygon, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as turf from '@turf/turf';
+import RNPickerSelect from 'react-native-picker-select';
 
-// Sample walkable path GeoJSON and city boundary - put these in assets later
-import walkablePaths from '../../assets/walkablePaths.json';
-import cityBoundary from '../../assets/cityBoundary.json';
+import walkablePaths from '../assets/walkablePaths.json';
+import cityBoundary from '../assets/cityBoundary.json';
 
 export default function HomeScreen() {
   const [location, setLocation] = useState<any>(null);
   const [trackedPoints, setTrackedPoints] = useState<any[]>([]);
+  const [currentCity, setCurrentCity] = useState<any>(null);
+  const [manualSelection, setManualSelection] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -19,6 +21,11 @@ export default function HomeScreen() {
 
       let loc = await Location.getCurrentPositionAsync({});
       setLocation(loc.coords);
+
+      if (!manualSelection) {
+        const detected = detectCurrentCity(loc.coords, cityBoundary);
+        setCurrentCity(detected);
+      }
     })();
   }, []);
 
@@ -30,6 +37,17 @@ export default function HomeScreen() {
     }, 5000);
     return () => clearInterval(interval);
   }, [location]);
+
+  const detectCurrentCity = (location: any, allCitiesGeoJSON: any) => {
+    const point = turf.point([location.longitude, location.latitude]);
+
+    for (let feature of allCitiesGeoJSON.features) {
+      if (turf.booleanPointInPolygon(point, feature)) {
+        return feature;
+      }
+    }
+    return null;
+  };
 
   const calculateCoverage = () => {
     if (trackedPoints.length < 2) return 0;
@@ -49,7 +67,6 @@ export default function HomeScreen() {
     return (walkedCount / walkablePaths.features.length) * 100;
   };
 
-  
   const renderPolygonCoordinates = (feature: any) => {
     const { type, coordinates } = feature.geometry;
 
@@ -76,6 +93,24 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <RNPickerSelect
+        placeholder={{ label: 'شهر خود را انتخاب کنید...', value: null }}
+        onValueChange={(value) => {
+          const selectedCity = cityBoundary.features.find(f => f.properties.name === value);
+          if (selectedCity) {
+            setCurrentCity(selectedCity);
+            setManualSelection(true);
+          }
+        }}
+        items={cityBoundary.features
+          .filter(f => f.properties?.shapeName)
+          .sort((a, b) => a.properties.shapeName.localeCompare(b.properties.shapeName, 'fa'))
+          .map(f => ({
+            label: f.properties.shapeName,
+            value: f.properties.shapeName
+        }))}
+      />
+
       <MapView
         style={styles.map}
         showsUserLocation
@@ -86,21 +121,19 @@ export default function HomeScreen() {
           longitudeDelta: 0.05,
         }}
       >
-        {/* City Border */}
-        {cityBoundary.features.map((feature: any, idx: number) =>
-          renderPolygonCoordinates(feature).map((coords: any, subIdx: number) => (
-          <Polygon
-            key={`${idx}-${subIdx}`}
-            coordinates={coords}
-            strokeColor="blue"
-            fillColor="rgba(135,206,250,0.3)"
-            strokeWidth={2}
+        {/* مرز شهر فعلی */}
+        {currentCity &&
+          renderPolygonCoordinates(currentCity).map((coords: any, subIdx: number) => (
+            <Polygon
+              key={`current-${subIdx}`}
+              coordinates={coords}
+              strokeColor="blue"
+              fillColor="rgba(135,206,250,0.3)"
+              strokeWidth={2}
             />
-          ))
-        )}
+          ))}
 
-
-        {/* Walkable Paths */}
+        {/* مسیرهای قابل پیاده‌روی */}
         {walkablePaths.features.map((feature: any, idx: number) => (
           <Polyline
             key={idx}
@@ -128,12 +161,17 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   overlayText: {
     position: 'absolute',
-    top: 40,
+    bottom: 20,
     left: 20,
     backgroundColor: 'white',
     padding: 10,
-    fontSize: 20,
+    fontSize: 18,
     borderRadius: 10,
+    zIndex: 5,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
 });
 
