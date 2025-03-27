@@ -49,6 +49,28 @@ export default function HomeScreen() {
     return (walkedCount / walkablePaths.features.length) * 100;
   };
 
+  
+  const renderPolygonCoordinates = (feature: any) => {
+    const { type, coordinates } = feature.geometry;
+
+    if (type === 'Polygon') {
+      return [coordinates[0].map(([lng, lat]: [number, number]) => ({
+        latitude: lat,
+        longitude: lng,
+      }))];
+    }
+
+    if (type === 'MultiPolygon') {
+      return coordinates.map(polygon =>
+        polygon[0].map(([lng, lat]: [number, number]) => ({
+          latitude: lat,
+          longitude: lng,
+        }))
+      );
+    }
+
+    return [];
+  };
 
   if (!location) return <ActivityIndicator style={{ flex: 1 }} />;
 
@@ -65,17 +87,18 @@ export default function HomeScreen() {
         }}
       >
         {/* City Border */}
-        <Polygon
-          coordinates={cityBoundary.features[0].geometry.coordinates[0].map(
-            ([lng, lat]: [number, number]) => ({
-              latitude: lat,
-              longitude: lng,
-            })
-          )}
-          strokeColor="blue"
-          fillColor="rgba(135,206,250,0.3)"
-          strokeWidth={2}
-        />
+        {cityBoundary.features.map((feature: any, idx: number) =>
+          renderPolygonCoordinates(feature).map((coords: any, subIdx: number) => (
+          <Polygon
+            key={`${idx}-${subIdx}`}
+            coordinates={coords}
+            strokeColor="blue"
+            fillColor="rgba(135,206,250,0.3)"
+            strokeWidth={2}
+            />
+          ))
+        )}
+
 
         {/* Walkable Paths */}
         {walkablePaths.features.map((feature: any, idx: number) => (
