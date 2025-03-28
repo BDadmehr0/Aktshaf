@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
-import MapView, { Marker, Polygon, Polyline } from 'react-native-maps';
+import MapView, { Polygon, Polyline } from 'react-native-maps';
 import * as Location from 'expo-location';
 import * as turf from '@turf/turf';
 import RNPickerSelect from 'react-native-picker-select';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 import walkablePaths from '../assets/walkablePaths.json';
 import cityBoundary from '../assets/cityBoundary.json';
@@ -92,27 +94,31 @@ export default function HomeScreen() {
   if (!location) return <ActivityIndicator style={{ flex: 1 }} />;
 
   return (
-    <View style={styles.container}>
-      <RNPickerSelect
-        placeholder={{ label: 'شهر خود را انتخاب کنید...', value: null }}
-        onValueChange={(value) => {
-          const selectedCity = cityBoundary.features.find(f => f.properties.name === value);
-          if (selectedCity) {
-            setCurrentCity(selectedCity);
-            setManualSelection(true);
-          }
-        }}
-        items={cityBoundary.features
-          .filter(f => f.properties?.shapeName)
-          .sort((a, b) => a.properties.shapeName.localeCompare(b.properties.shapeName, 'fa'))
-          .map(f => ({
-            label: f.properties.shapeName,
-            value: f.properties.shapeName
-        }))}
-      />
+    <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar style="dark" /> {/* متن‌های وضعیت مثل ساعت و باتری حالا تیره می‌شن */}
+
+      <View style={styles.pickerContainer}>
+        <RNPickerSelect
+          placeholder={{ label: 'شهر خود را انتخاب کنید...', value: null }}
+          onValueChange={(value) => {
+            const selectedCity = cityBoundary.features.find(f => f.properties.shapeName === value);
+            if (selectedCity) {
+              setCurrentCity(selectedCity);
+              setManualSelection(true);
+            }
+          }}
+          items={cityBoundary.features
+            .filter(f => f.properties?.shapeName)
+            .sort((a, b) => a.properties.shapeName.localeCompare(b.properties.shapeName, 'fa'))
+            .map(f => ({
+              label: f.properties.shapeName,
+              value: f.properties.shapeName
+            }))}
+        />
+      </View>
 
       <MapView
-        style={styles.map}
+        style={{ flex: 1 }}
         showsUserLocation
         initialRegion={{
           latitude: location.latitude,
@@ -121,7 +127,6 @@ export default function HomeScreen() {
           longitudeDelta: 0.05,
         }}
       >
-        {/* مرز شهر فعلی */}
         {currentCity &&
           renderPolygonCoordinates(currentCity).map((coords: any, subIdx: number) => (
             <Polygon
@@ -133,7 +138,6 @@ export default function HomeScreen() {
             />
           ))}
 
-        {/* مسیرهای قابل پیاده‌روی */}
         {walkablePaths.features.map((feature: any, idx: number) => (
           <Polyline
             key={idx}
@@ -150,15 +154,27 @@ export default function HomeScreen() {
       </MapView>
 
       <Text style={styles.overlayText}>
-        {calculateCoverage().toFixed(1)}% Explored
+        {calculateCoverage().toFixed(1)}% پیش‌روی
       </Text>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { flex: 1 },
+  pickerContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    right: 10,
+    zIndex: 10,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 10,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
   overlayText: {
     position: 'absolute',
     bottom: 20,
